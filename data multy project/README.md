@@ -30,3 +30,33 @@ An interactive data analysis dashboard built using **Streamlit** to explore book
 
 ## 📁 Project Structure
 
+├── app.py # Streamlit app for interactive dashboard
+├── scraper.py # Script to scrape book data from the website
+├── clean_data.py # Data cleaning and preprocessing
+├── analysis.py # Statistical tests and visual analysis
+├── books_data.csv # Raw scraped data
+├── clean_books_data.csv # Cleaned and processed data
+├── correlation_heatmap.png# Correlation matrix heatmap
+├── requirements.txt # Python dependencies
+└── README.md # Project documentation
+
+
+## 📊 Statistical Tests Included
+
+- **Normality Test**: Shapiro-Wilk test on price
+- **ANOVA Test**: Compare mean price across availability statuses
+- **Tukey's HSD Test**: Post-hoc test for pairwise comparison
+- **Chi-Square Test**: Test independence between price category and availability
+
+---
+
+## 📦 Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-username/book-data-dashboard.git
+   cd book-data-dashboard
+
+
+
+
