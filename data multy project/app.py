@@ -159,189 +159,59 @@ with tab3:
         word_counts = Counter(words).most_common(10)
         st.table(pd.DataFrame(word_counts, columns=['كلمة', 'تكرار']))
 
-# --- اختبارات إحصائية ---
+# --- اختبارات إحصائية ---# ------------------ Tab 4: الاختبارات الإحصائية ------------------
 with tab4:
-    st.subheader("🧪 الاختبارات الإحصائية المتقدمة")
-    
-    # 1. اختبار التوزيع الطبيعي (Shapiro-Wilk)
-    st.markdown("#### 1. اختبار التوزيع الطبيعي (Shapiro-Wilk)")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        try:
-            stat, p = shapiro(df['price'])
-            st.write("**اختبار توزيع السعر:**")
-            st.write(f"- الإحصائية = {stat:.4f}")
-            st.write(f"- القيمة p = {p:.4e}")
-            if p > 0.05:
-                st.success("البيانات لا تتبع توزيعًا طبيعيًا", icon="⚠️")
-            else:البيانات تتبع توزيعًا طبيعيًا", icon="✅
-                st.warning("البيانات تتبع توزيعًا طبيعيًا", icon="✅")
-        except Exception as e:
-            st.error(f"خطأ في اختبار السعر: {str(e)}")
-    
-    with col2:
-        try:
-            stat, p = shapiro(df['rating'])
-            st.write("**اختبار توزيع التقييم:**")
-            st.write(f"- الإحصائية = {stat:.4f}")
-            st.write(f"- القيمة p = {p:.4e}")
-            if p > 0.05:
-                st.success("البيانات تتبع توزيعًا طبيعيًا", icon="✅")
-            else:
-                st.warning("البيانات لا تتبع توزيعًا طبيعيًا", icon="⚠️")
-        except Exception as e:
-            st.error(f"خطأ في اختبار التقييم: {str(e)}")
-    
-    st.divider()
-    
-    # 2. اختبار Levene لتساوي التباين (بين مستويات التقييم)
-    st.markdown("#### 2. اختبار تساوي التباين (Levene)")
-    st.write("**مقارنة تباينات الأسعار بين مستويات التقييم المختلفة:**")
-    
-    try:
-        rating_groups = [df[df['rating'] == r]['price'] for r in sorted(df['rating'].unique()) if len(df[df['rating'] == r]) >= 2]
-        
-        if len(rating_groups) >= 2:
-            stat, p = levene(*rating_groups)
-            st.write(f"- الإحصائية = {stat:.4f}")
-            st.write(f"- القيمة p = {p:.4e}")
-            
-            if p > 0.05:
-                st.success("يمكن افتراض تساوي التباينات بين مستويات التقييم", icon="✅")
-            else:
-                st.warning("لا يمكن افتراض تساوي التباينات بين مستويات التقييم", icon="⚠️")
-            
-            # عرض متوسط التباين لكل مجموعة
-            st.write("\n**مقارنة التباينات:**")
-            var_comparison = []
-            for rating in sorted(df['rating'].unique()):
-                group_data = df[df['rating'] == rating]['price']
-                if len(group_data) >= 2:
-                    var_comparison.append({
-                        'مستوى التقييم': rating,
-                        'عدد الكتب': len(group_data),
-                        'متوسط السعر': f"£{group_data.mean():.2f}",
-                        'التباين': f"{group_data.var():.2f}"
-                    })
-            st.table(pd.DataFrame(var_comparison))
-        else:
-            st.warning("يحتاج إلى مستويين تقييم على الأقل مع بيانات كافية")
-    except Exception as e:
-        st.error(f"خطأ في إجراء اختبار Levene: {str(e)}")
-    
-    st.divider()
-    
-    # 3. اختبار T-test لمقارنة الأسعار حسب التوفر
-    st.markdown("#### 3. اختبار T-test لمقارنة الأسعار حسب التوفر")
-    st.write("**مقارنة متوسطات الأسعار بين حالات التوفر المختلفة:**")
-    
-    try:
-        availability_types = df['availability'].unique()
-        comparisons = []
-        
-        for i in range(len(availability_types)):
-            for j in range(i+1, len(availability_types)):
-                group1 = availability_types[i]
-                group2 = availability_types[j]
-                data1 = df[df['availability'] == group1]['price']
-                data2 = df[df['availability'] == group2]['price']
-                
-                if len(data1) >= 2 and len(data2) >= 2:
-                    t_stat, p_value = ttest_ind(data1, data2, equal_var=False)
-                    comparisons.append({
-                        'المجموعة الأولى': group1,
-                        'المجموعة الثانية': group2,
-                        'متوسط المجموعة الأولى': f"£{data1.mean():.2f}",
-                        'متوسط المجموعة الثانية': f"£{data2.mean():.2f}",
-                        't-statistic': f"{t_stat:.4f}",
-                        'p-value': f"{p_value:.4e}",
-                        'النتيجة': "يوجد فرق معنوي" if p_value <= 0.05 else "لا يوجد فرق معنوي"
-                    })
-        
-        if comparisons:
-            st.table(pd.DataFrame(comparisons))
-            
-            # عرض تفسير النتائج
-            st.write("\n**تفسير النتائج:**")
-            for comp in comparisons:
-                if float(comp['p-value']) <= 0.05:
-                    st.info(f"يوجد فرق ذو دلالة إحصائية بين {comp['المجموعة الأولى']} و {comp['المجموعة الثانية']} (p = {comp['p-value']})")
-        else:
-            st.warning("لا توجد مقارنات صالحة يمكن إجراؤها (تحتاج كل مجموعة إلى كتابين على الأقل)")
-    except Exception as e:
-        st.error(f"خطأ في إجراء اختبار t-test: {str(e)}")
-    
-    st.divider()
-    
-    # 4. اختبار ANOVA لمقارنة الأسعار حسب التقييم
-    st.markdown("#### 4. اختبار ANOVA لمقارنة الأسعار حسب التقييم")
-    st.write("**مقارنة متوسطات الأسعار بين مستويات التقييم المختلفة:**")
-    
-    try:
-        rating_groups = [df[df['rating'] == r]['price'] for r in sorted(df['rating'].unique()) if len(df[df['rating'] == r]) >= 2]
-        
-        if len(rating_groups) >= 2:
-            f_stat, p_value = f_oneway(*rating_groups)
-            st.write(f"- F-statistic = {f_stat:.4f}")
-            st.write(f"- p-value = {p_value:.4e}")
-            
-            if p_value > 0.05:
-                st.success("لا يوجد فرق ذو دلالة إحصائية بين المجموعات", icon="✅")
-            else:
-                st.warning("يوجد فرق ذو دلالة إحصائية بين المجموعات", icon="⚠️")
-            
-            # عرض متوسط السعر لكل مستوى تقييم
-            st.write("\n**متوسط السعر حسب التقييم:**")
-            avg_prices = []
-            for rating in sorted(df['rating'].unique()):
-                group_data = df[df['rating'] == rating]['price']
-                if len(group_data) >= 1:
-                    avg_prices.append({
-                        'مستوى التقييم': rating,
-                        'عدد الكتب': len(group_data),
-                        'متوسط السعر': f"£{group_data.mean():.2f}",
-                        'الانحراف المعياري': f"£{group_data.std():.2f}"
-                    })
-            st.table(pd.DataFrame(avg_prices))
-        else:
-            st.warning("يحتاج إلى مستويين تقييم على الأقل مع بيانات كافية")
-    except Exception as e:
-        st.error(f"خطأ في إجراء اختبار ANOVA: {str(e)}")
-    
-    st.divider()
-    
-    # 5. اختبار Chi-square للاستقلال بين التوفر والتقييم
-    st.markdown("#### 5. اختبار استقلالية التوفر والتقييم (Chi-square)")
-    
-    try:
-        contingency_table = pd.crosstab(df['availability'], df['rating'])
-        
-        if contingency_table.size > 0 and not (contingency_table == 0).all().all():
-            chi2, p, dof, expected = chi2_contingency(contingency_table)
-            st.write(f"- Chi-square statistic = {chi2:.4f}")
-            st.write(f"- p-value = {p:.4e}")
-            st.write(f"- Degrees of freedom = {dof}")
-            
-            if p > 0.05:
-                st.success("لا يوجد ارتباط بين حالة التوفر ومستوى التقييم", icon="✅")
-            else:
-                st.warning("يوجد ارتباط بين حالة التوفر ومستوى التقييم", icon="⚠️")
-            
-            # عرض جدول التكرارات
-            st.write("\n**جدول التكرارات الملاحظة:**")
-            st.table(contingency_table)
-            
-            st.write("\n**جدول التكرارات المتوقعة:**")
-            st.table(pd.DataFrame(expected, 
-                                index=contingency_table.index, 
-                                columns=contingency_table.columns).round(2))
-        else:
-            st.warning("لا توجد بيانات كافية لبناء جدول التكرارات")
-    except Exception as e:
-        st.error(f"خطأ في إجراء اختبار Chi-square: {str(e)}")
+    st.header("تحليل إحصائي حسب السمات المختلفة")
 
-        
+    # المقارنة حسب النوع (T-test)
+    st.subheader("1. مقارنة الأسعار حسب النوع (T-test)")
+    groups = df['Category'].unique()
+    if len(groups) == 2:
+        group1 = df[df['Category'] == groups[0]]['Price']
+        group2 = df[df['Category'] == groups[1]]['Price']
+        t_stat, p_val = stats.ttest_ind(group1, group2)
+        st.markdown(f"- T-statistic = {t_stat:.4f}")
+        st.markdown(f"- p-value = {p_val:.4f}")
+        if p_val < 0.05:
+            st.success("يوجد فرق دال إحصائيًا بين النوعين")
+        else:
+            st.info("لا يوجد فرق دال إحصائيًا بين النوعين")
+    else:
+        st.warning("البيانات لا تحتوي على مجموعتين فقط للمقارنة.")
+
+    # المقارنة حسب التقييم (ANOVA)
+    st.subheader("2. مقارنة الأسعار حسب التقييم (اختبار ANOVA)")
+    grouped_prices = [group['Price'].values for name, group in df.groupby('Rating')]
+    f_stat, p_val = stats.f_oneway(*grouped_prices)
+    st.markdown(f"- F-statistic = {f_stat:.4f}")
+    st.markdown(f"- p-value = {p_val:.4f}")
+    if p_val < 0.05:
+        st.success("يوجد فرق دال إحصائيًا بين مستويات التقييم المختلفة")
+    else:
+        st.info("لا يوجد فرق دال إحصائيًا بين مستويات التقييم المختلفة")
+
+    # جدول لمتوسط السعر حسب التقييم
+    st.write("متوسط السعر حسب التقييم:")
+    rating_price_summary = df.groupby('Rating').agg(
+        متوسط_السعر=('Price', lambda x: f"£{x.mean():.2f}"),
+        عدد_الكتب=('Price', 'count')
+    ).reset_index().rename(columns={"Rating": "مستوى التقييم"})
+    st.dataframe(rating_price_summary)
+
+    # المقارنة حسب توفر المنتج (T-test)
+    st.subheader("3. مقارنة الأسعار حسب التوفر (T-test)")
+    if 'Availability' in df.columns:
+        available = df[df['Availability'] == 'In stock']['Price']
+        unavailable = df[df['Availability'] != 'In stock']['Price']
+        t_stat, p_val = stats.ttest_ind(available, unavailable)
+        st.markdown(f"- T-statistic = {t_stat:.4f}")
+        st.markdown(f"- p-value = {p_val:.4f}")
+        if p_val < 0.05:
+            st.success("يوجد فرق دال إحصائيًا حسب التوفر")
+        else:
+            st.info("لا يوجد فرق دال إحصائيًا حسب التوفر")
+    else:
+        st.warning("لا يوجد عمود 'Availability' في البيانات.")
 # --- الوصف الإحصائي ---
 with tab5:
     st.subheader("إحصاءات وصفية")
