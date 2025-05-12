@@ -174,9 +174,9 @@ with tab4:
             st.write(f"- الإحصائية = {stat:.4f}")
             st.write(f"- القيمة p = {p:.4e}")
             if p > 0.05:
-                st.success("البيانات تتبع توزيعًا طبيعيًا", icon="✅")
-            else:
-                st.warning("البيانات لا تتبع توزيعًا طبيعيًا", icon="⚠️")
+                st.success("البيانات لا تتبع توزيعًا طبيعيًا", icon="⚠️")
+            else:البيانات تتبع توزيعًا طبيعيًا", icon="✅
+                st.warning("البيانات تتبع توزيعًا طبيعيًا", icon="✅")
         except Exception as e:
             st.error(f"خطأ في اختبار السعر: {str(e)}")
     
