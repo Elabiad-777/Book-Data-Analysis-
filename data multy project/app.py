@@ -3,12 +3,13 @@ import pandas as pd
 import plotly.express as px
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy.stats import shapiro, levene, chi2_contingency, f_oneway, ttest_ind
+from scipy import stats 
 from collections import Counter
 import re
 import numpy as np
+from statsmodels.multivariate.manova import MANOVA
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
 
-# ------------------------- إعداد الصفحة -------------------------
 st.set_page_config(
     page_title="Book Data Dashboard",
     page_icon="📚",
@@ -16,18 +17,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ------------------------- تحميل البيانات -------------------------
 @st.cache_data
 def load_data():
     df = pd.read_csv('clean_books_data.csv')
-    # ضمان وجود قيم صالحة للاختبارات الإحصائية
     df = df.dropna(subset=['price', 'rating', 'availability'])
     df = df[(df['price'] > 0) & (df['rating'].between(1, 5))]
     return df
 
 df = load_data()
 
-# ------------------------- تحسين التنسيق -------------------------
 st.markdown("""
 <style>
     .st-emotion-cache-1y4p8pa { padding: 2rem; }
@@ -38,17 +36,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------------- شريط الفلاتر الجانبي -------------------------
 with st.sidebar:
-    st.header("⚙️ فلاتر البيانات")
-    search_title = st.text_input("🔍 بحث بالعنوان")
-    price_range = st.slider("💰 نطاق السعر (£)", float(df['price'].min()), float(df['price'].max()), (10.0, 50.0), step=0.5)
-    rating_options = st.multiselect("⭐ التقييم (من 1 إلى 5)", options=sorted(df['rating'].unique()), default=sorted(df['rating'].unique()))
-    availability_options = st.multiselect("📦 حالة التوفر", options=df['availability'].unique(), default=df['availability'].unique())
-    top_rated = st.checkbox("📌 الكتب الأعلى تقييمًا فقط (4-5 نجوم)")
-    st.download_button("💾 تحميل البيانات المصفاة", df.to_csv(index=False), "filtered_books.csv", "text/csv")
+    st.header("⚙️ Filters")
+    search_title = st.text_input("🔍 Search by Title")
+    price_range = st.slider("💰 Price Range (£)", float(df['price'].min()), float(df['price'].max()), (10.0, 50.0), step=0.5)
+    rating_options = st.multiselect("⭐ Rating (1 to 5)", options=sorted(df['rating'].unique()), default=sorted(df['rating'].unique()))
+    availability_options = st.multiselect("📦 Availability", options=df['availability'].unique(), default=df['availability'].unique())
+    top_rated = st.checkbox("📌 Top Rated Books Only (4-5 Stars)")
+    st.download_button("💾 Download Filtered Data", df.to_csv(index=False), "filtered_books.csv", "text/csv")
 
-# ------------------------- تطبيق الفلاتر -------------------------
 df_filtered = df[
     (df['price'] >= price_range[0]) & 
     (df['price'] <= price_range[1]) &
@@ -62,10 +58,8 @@ if search_title:
 if top_rated:
     df_filtered = df_filtered[df_filtered['rating'] >= 4]
 
-# ------------------------- مؤشرات الأداء الرئيسية -------------------------
-st.title("📊 لوحة تحليل بيانات الكتب")
+st.title("📊 Book Data Analysis Dashboard")
 
-# تنسيق خاص لعناصر KPIs
 st.markdown("""
     <style>
     .kpi-box {
@@ -92,7 +86,7 @@ kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 with kpi1:
     st.markdown(f"""
     <div class='kpi-box'>
-        <p>📚 عدد الكتب</p>
+        <p>📚 Total Books</p>
         <h1>{len(df_filtered)}</h1>
     </div>
     """, unsafe_allow_html=True)
@@ -100,7 +94,7 @@ with kpi1:
 with kpi2:
     st.markdown(f"""
     <div class='kpi-box'>
-        <p>💰 متوسط السعر</p>
+        <p>💰 Average Price</p>
         <h1>£{df_filtered['price'].mean():.2f}</h1>
     </div>
     """, unsafe_allow_html=True)
@@ -108,7 +102,7 @@ with kpi2:
 with kpi3:
     st.markdown(f"""
     <div class='kpi-box'>
-        <p>⭐ متوسط التقييم</p>
+        <p>⭐ Average Rating</p>
         <h1>{df_filtered['rating'].mean():.1f}/5</h1>
     </div>
     """, unsafe_allow_html=True)
@@ -116,32 +110,29 @@ with kpi3:
 with kpi4:
     st.markdown(f"""
     <div class='kpi-box'>
-        <p>🏆 أعلى سعر</p>
+        <p>🏆 Highest Price</p>
         <h1>£{df_filtered['price'].max()}</h1>
     </div>
     """, unsafe_allow_html=True)
 
-# ------------------------- التابات -------------------------
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 التحليلات العامة", "📊 العلاقات بين المتغيرات", "📋 عرض البيانات", "🧪 اختبارات إحصائية", "📚 وصف إحصائي"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 General Analytics", "📊 Variable Relationships", "📋 Data View", "🧪 Statistical Tests", "📚 Descriptive Stats"])
 
-# --- التحليلات العامة ---
 with tab1:
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("توزيع الأسعار")
+        st.subheader("Price Distribution")
         fig1 = px.histogram(df_filtered, x='price', nbins=20, color='availability', template='plotly_white')
         st.plotly_chart(fig1, use_container_width=True)
     with col2:
-        st.subheader("توزيع التقييمات")
+        st.subheader("Rating Distribution")
         fig2 = px.pie(df_filtered, names='rating', color_discrete_sequence=px.colors.sequential.Viridis, hole=0.4)
         st.plotly_chart(fig2, use_container_width=True)
 
-# --- العلاقات ---
 with tab2:
-    st.subheader("العلاقة بين السعر والتقييم")
+    st.subheader("Price vs Rating")
     fig3 = px.scatter(df_filtered, x='price', y='rating', color='availability', hover_name='title', size='price', trendline="lowess")
     st.plotly_chart(fig3, use_container_width=True)
-    st.subheader("مقارنة التوفر حسب التقييم")
+    st.subheader("Availability by Rating")
     fig4 = px.box(df_filtered, x='rating', y='price', color='availability', points="all")
     st.plotly_chart(fig4, use_container_width=True)
     st.subheader("Heatmap")
@@ -149,85 +140,102 @@ with tab2:
     sns.heatmap(df_filtered[['price', 'rating']].corr(), annot=True, cmap="coolwarm", ax=ax)
     st.pyplot(fig)
 
-# --- عرض البيانات ---
 with tab3:
-    st.subheader("عرض البيانات المصفاة")
+    st.subheader("Filtered Data View")
     st.dataframe(df_filtered, use_container_width=True)
-    if st.checkbox("🔍 عرض تحليل نصي للعناوين"):
+    if st.checkbox("🔍 Textual Analysis of Titles"):
         words = ' '.join(df_filtered['title']).lower()
         words = re.findall(r'\w{3,}', words)
         word_counts = Counter(words).most_common(10)
-        st.table(pd.DataFrame(word_counts, columns=['كلمة', 'تكرار']))
+        st.table(pd.DataFrame(word_counts, columns=['Word', 'Count']))
 
-# --- اختبارات إحصائية ---# ------------------ Tab 4: الاختبارات الإحصائية ------------------
 with tab4:
-    st.header("تحليل إحصائي حسب السمات المختلفة")
+    st.header("🧪 Comprehensive Statistical Tests between Price and Rating")
+    st.markdown("### ℹ️ All tests assume α = 0.05")
+    
+    df_test = df_filtered[['price', 'rating']].dropna().copy()
+    df_test['price_z'] = stats.zscore(df_test['price'])
+    df_test['rating_z'] = stats.zscore(df_test['rating'])
 
-    # المقارنة حسب النوع (T-test)
-    st.subheader("1. مقارنة الأسعار حسب النوع (T-test)")
-    groups = df['Category'].unique()
-    if len(groups) == 2:
-        group1 = df[df['Category'] == groups[0]]['Price']
-        group2 = df[df['Category'] == groups[1]]['Price']
-        t_stat, p_val = stats.ttest_ind(group1, group2)
-        st.markdown(f"- T-statistic = {t_stat:.4f}")
-        st.markdown(f"- p-value = {p_val:.4f}")
-        if p_val < 0.05:
-            st.success("يوجد فرق دال إحصائيًا بين النوعين")
-        else:
-            st.info("لا يوجد فرق دال إحصائيًا بين النوعين")
-    else:
-        st.warning("البيانات لا تحتوي على مجموعتين فقط للمقارنة.")
+    # تصنيف المجموعات حسب rating الأصلي وليس الموحد
+    df_test['rating_group'] = pd.cut(df_filtered['rating'], bins=3, labels=['Low', 'Medium', 'High'])
 
-    # المقارنة حسب التقييم (ANOVA)
-    st.subheader("2. مقارنة الأسعار حسب التقييم (اختبار ANOVA)")
-    grouped_prices = [group['Price'].values for name, group in df.groupby('Rating')]
-    f_stat, p_val = stats.f_oneway(*grouped_prices)
-    st.markdown(f"- F-statistic = {f_stat:.4f}")
-    st.markdown(f"- p-value = {p_val:.4f}")
-    if p_val < 0.05:
-        st.success("يوجد فرق دال إحصائيًا بين مستويات التقييم المختلفة")
-    else:
-        st.info("لا يوجد فرق دال إحصائيًا بين مستويات التقييم المختلفة")
+    # --- Shapiro-Wilk ---
+    st.subheader("1️⃣ Shapiro-Wilk Test for Normality")
+    st.write("**H₀**: Data is normally distributed  \n**H₁**: Data is not normally distributed")
+    normality_results = pd.DataFrame(columns=['Variable', 'W Statistic', 'p-value', 'Decision', 'Conclusion'])
+    for col in ['price_z', 'rating_z']:
+        stat, p = stats.shapiro(df_test[col])
+        decision = "✅ Normal" if p > 0.05 else "❌ Not Normal"
+        conclusion = "Meets normality" if p > 0.05 else "Violates normality"
+        normality_results.loc[len(normality_results)] = [col.replace('_z', ''), f"{stat:.4f}", f"{p:.4f}", decision, conclusion]
+    st.table(normality_results)
 
-    # جدول لمتوسط السعر حسب التقييم
-    st.write("متوسط السعر حسب التقييم:")
-    rating_price_summary = df.groupby('Rating').agg(
-        متوسط_السعر=('Price', lambda x: f"£{x.mean():.2f}"),
-        عدد_الكتب=('Price', 'count')
-    ).reset_index().rename(columns={"Rating": "مستوى التقييم"})
-    st.dataframe(rating_price_summary)
+    # --- Levene's Test ---
+    st.subheader("2️⃣ Levene's Test for Homogeneity of Variance")
+    st.write("**H₀**: Equal variances between rating groups  \n**H₁**: Unequal variances between rating groups")
+    groups = [df_test[df_test['rating_group'] == g]['price_z'] for g in df_test['rating_group'].unique()]
+    stat, p = stats.levene(*groups)
+    levene_result = pd.DataFrame({
+        'Tested Variable': ['Price across Rating Groups'],
+        'Levene Statistic': [f"{stat:.4f}"],
+        'p-value': [f"{p:.4f}"],
+        'Decision': ["✅ Equal variances" if p > 0.05 else "❌ Unequal variances"],
+        'Conclusion': ["Variance assumption met" if p > 0.05 else "Variance assumption violated"]
+    })
+    st.table(levene_result)
 
-    # المقارنة حسب توفر المنتج (T-test)
-    st.subheader("3. مقارنة الأسعار حسب التوفر (T-test)")
-    if 'Availability' in df.columns:
-        available = df[df['Availability'] == 'In stock']['Price']
-        unavailable = df[df['Availability'] != 'In stock']['Price']
-        t_stat, p_val = stats.ttest_ind(available, unavailable)
-        st.markdown(f"- T-statistic = {t_stat:.4f}")
-        st.markdown(f"- p-value = {p_val:.4f}")
-        if p_val < 0.05:
-            st.success("يوجد فرق دال إحصائيًا حسب التوفر")
-        else:
-            st.info("لا يوجد فرق دال إحصائيًا حسب التوفر")
-    else:
-        st.warning("لا يوجد عمود 'Availability' في البيانات.")
-# --- الوصف الإحصائي ---
+    # --- Correlation Test ---
+    st.subheader("3️⃣ Pearson Correlation between Price and Rating")
+    st.write("**H₀**: No correlation between price and rating  \n**H₁**: There is a correlation between price and rating")
+    corr_coef, p_value = stats.pearsonr(df_test['price_z'], df_test['rating_z'])
+    corr_result = pd.DataFrame({
+        'Correlation Coefficient': [f"{corr_coef:.4f}"],
+        'p-value': [f"{p_value:.4f}"],
+        'Decision': ["✅ Significant" if p_value < 0.05 else "❌ Not significant"],
+        'Conclusion': ["There is a relationship" if p_value < 0.05 else "No clear relationship"]
+    })
+    st.table(corr_result)
+
+    # --- MANOVA ---
+    st.subheader("4️⃣ MANOVA: Effect of Rating Group on Price and Rating")
+    st.write("**H₀**: Rating groups have no effect on price and rating  \n**H₁**: Rating groups affect price and rating jointly")
+    try:
+        manova = MANOVA.from_formula('price + rating ~ rating_group', data=df_test)
+        result = manova.mv_test()
+        wilks = result.results['rating_group']['stat']
+        stat_val = wilks.loc["Wilks' lambda", "Value"]
+        f_val = wilks.loc["Wilks' lambda", "F Value"]
+        p_val = wilks.loc["Wilks' lambda", "Pr > F"]
+        manova_result = pd.DataFrame({
+            "Wilks' Lambda": [f"{stat_val:.4f}"],
+            'F-value': [f"{f_val:.4f}"],
+            'p-value': [f"{p_val:.4f}"],
+            'Decision': ["✅ Significant effect" if p_val < 0.05 else "❌ No significant effect"],
+            'Conclusion': ["Groups influence jointly" if p_val < 0.05 else "No joint effect"]
+        })
+        st.table(manova_result)
+    except Exception as e:
+        st.warning(f"MANOVA could not be performed: {str(e)}")
+
+
+
+
+
 with tab5:
-    st.subheader("إحصاءات وصفية")
-    st.write("#### الإحصاءات الأساسية:")
+    st.subheader("Descriptive Statistics")
+    st.write("#### Summary Statistics:")
     st.dataframe(df_filtered[['price', 'rating']].describe())
-    st.write("#### مصفوفة التباين-التغاير:")
+    st.write("#### Covariance Matrix:")
     st.dataframe(df_filtered[['price', 'rating']].cov())
-    st.write("#### مصفوفة الارتباط:")
+    st.write("#### Correlation Matrix:")
     st.dataframe(df_filtered[['price', 'rating']].corr())
 
-# ------------------------- معلومات إضافية -------------------------
 st.divider()
-with st.expander("ℹ️ معلومات عن المشروع"):
+with st.expander("ℹ️ Project Info"):
     st.write("""
-    **📚 مشروع تحليل بيانات الكتب**
-    - تم جمع البيانات من موقع [Books to Scrape](http://books.toscrape.com/)
-    - الأدوات المستخدمة: Python, Pandas, Streamlit, Plotly
-    - تحليل الأسعار، التقييمات، حالة التوفر
+    **📚 Book Data Analysis Project**
+    - Data collected from [Books to Scrape](http://books.toscrape.com/)
+    - Tools used: Python, Pandas, Streamlit, Plotly
+    - Focus: Prices, Ratings, Availability
     """)
